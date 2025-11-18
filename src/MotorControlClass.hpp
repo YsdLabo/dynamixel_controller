@@ -93,6 +93,9 @@ private:
             target_left_vel = target_omega_left_;
             target_right_vel = target_omega_right_;
         }
+        rclcpp::Time current_time = this->now();
+        double dt = (current_time - last_time).seconds();
+        last_time = current_time;
 
         // Dynamixelへの速度書き込み
         dxl_interface_->set_velocity(LEFT_ID, target_left_vel);
@@ -102,29 +105,30 @@ private:
         int32_t left_pos_unit, right_pos_unit;
         dxl_interface_->get_position(LEFT_ID, left_pos_unit);
         dxl_interface_->get_position(RIGHT_ID, right_pos_unit);
-        int32_t delta_left = left_pos_unit - last_left_pos_unit_;
-        if(delta_left < -2048) delta_left += 4096;
-        else if(delta_left > 2048) delta_left -= 4096;
-        int32_t delta_right = right_pos_unit - last_right_pos_unit_;
-        if(delta_right < -2048) delta_right += 4096;
-        else if(delta_right > 2048) delta_right -= 4096;
+        int32_t delta_left_unit = left_pos_unit - last_left_pos_unit_;
+        if(delta_left_unit < -2048) delta_left_unit += 4096;
+        else if(delta_left_unit > 2048) delta_left_unit -= 4096;
+        last_left_pos_unit_ = left_pos_unit;
+        int32_t delta_right_unit = right_pos_unit - last_right_pos_unit_;
+        if(delta_right_unit < -2048) delta_right_unit += 4096;
+        else if(delta_right_unit > 2048) delta_right_unit -= 4096;
+        last_right_pos_unit_ = right_pos_unit;
 
         // JointStateの配信
         auto joint_state_msg = std::make_unique<sensor_msgs::msg::JointState>();
-        joint_state_msg->header.stamp = this->now();
+        joint_state_msg->header.stamp = current_time;
         joint_state_msg->name = {"left_wheel_joint", "right_wheel_joint"};
-        double left_pos = (double)left_pos_unit * UNIT_TO_RAD;
-        double right_pos = (double)right_pos_unit * UNIT_TO_RAD;
-        left_pos_ += ;
-        right_pos_ += ;
+        double delta_left = (double)delta_left_unit * UNIT_TO_RAD;
+        double delta_ribght = (double)delta_right_unit * UNIT_TO_RAD;
+        left_pos_ += delta_left;
+        right_pos_ += delta_right;
         joint_state_msg->position = {left_pos_, right_pos_};
-        joint_state_msg->velocity = {0.0, 0.0};
+        dobule vl = delta_left / dt;
+        double vr = delta_right / dt;
+        joint_state_msg->velocity = {vl, vr};
         joint_state_publisher_ ->publish(std::move(joint_state_msg));
-        last_left_pos_ = left_pos;
-        last_right_pos_ = right_pos;
 
-        RCLCPP_DEBUG(this->get_logger(), "Published JointState: L=%.2f, R=%.2f", left_rad, right_rad);
-
+        RCLCPP_DEBUG(this->get_logger(), "Published JointState: L=%.2f, R=%.2f", left_pos_, right_pos_);
     }
 
     rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_vel_subscription_;
@@ -143,9 +147,7 @@ private:
     double target_angular_z_;
     int32_t last_left_pos_unit_;
     int32_t last_right_pos_unit_;
-    int32_t left_pos_unit_i_;
-    int32_t right_pos_unit_i_;
-    long left_pos_;
-    long right_pos_;
+    double left_pos_;
+    double right_pos_;
     rclcpp::Time last_time;
 };
