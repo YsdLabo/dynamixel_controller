@@ -16,7 +16,7 @@ class MotorControl : public rclcpp::Node
 public:
     MotorControl(double radius, double separation)
         : Node("motor_control_node"), wheel_radius_(radius), wheel_separation_(separation), 
-        target_omega_left_(0.0), target_omega_right_(0.0), target_linear_x_(0.0), target_angular_z_(0.0)
+        target_omega_left_(0.0), target_omega_right_(0.0), target_linear_x_(0.0), target_angular_z_(0.0), left_pos_(0.0), right_pos_(0.0)
     {
         // パラメータ宣言
         this->declare_parameter("control_frequency", 50.0);
@@ -65,7 +65,6 @@ public:
         }
         dxl_interface_->get_position(LEFT_ID, last_left_pos_unit_);
         dxl_interface_->get_position(RIGHT_ID, last_right_pos_unit_);
-        last_time = this->get_clock()->now();
     }
 
 private:
@@ -93,18 +92,22 @@ private:
             target_left_vel = target_omega_left_;
             target_right_vel = target_omega_right_;
         }
-        rclcpp::Time current_time = this->now();
-        double dt = (current_time - last_time).seconds();
-        last_time = current_time;
 
         // Dynamixelへの速度書き込み
         dxl_interface_->set_velocity(LEFT_ID, target_left_vel);
         dxl_interface_->set_velocity(RIGHT_ID, target_right_vel);
 
-        // Dynamixelからの現在位置読み込み（エンコーダ）
+        // Dynamixelから現在位置の読み込み（エンコーダ）
         int32_t left_pos_unit, right_pos_unit;
         dxl_interface_->get_position(LEFT_ID, left_pos_unit);
         dxl_interface_->get_position(RIGHT_ID, right_pos_unit);
+
+        // Dynamixelから現在回転速度の読み込み
+        double left_vel, right_vel;
+        dxl_interface_->get_velocity(LEFT_ID, left_vel);
+        dxl_interface_->get_velocity(RIGHT_ID, right_vel);
+
+        // 左右車輪の回転角度を計算
         int32_t delta_left_unit = left_pos_unit - last_left_pos_unit_;
         if(delta_left_unit < -2048) delta_left_unit += 4096;
         else if(delta_left_unit > 2048) delta_left_unit -= 4096;
@@ -113,19 +116,15 @@ private:
         if(delta_right_unit < -2048) delta_right_unit += 4096;
         else if(delta_right_unit > 2048) delta_right_unit -= 4096;
         last_right_pos_unit_ = right_pos_unit;
-
+        left_pos_ += ((double)delta_left_unit * UNIT_TO_RAD);
+        right_pos_ += ((double)delta_right_unit * UNIT_TO_RAD);
+        
         // JointStateの配信
         auto joint_state_msg = std::make_unique<sensor_msgs::msg::JointState>();
-        joint_state_msg->header.stamp = current_time;
+        joint_state_msg->header.stamp = this->now();
         joint_state_msg->name = {"left_wheel_joint", "right_wheel_joint"};
-        double delta_left = (double)delta_left_unit * UNIT_TO_RAD;
-        double delta_ribght = (double)delta_right_unit * UNIT_TO_RAD;
-        left_pos_ += delta_left;
-        right_pos_ += delta_right;
         joint_state_msg->position = {left_pos_, right_pos_};
-        dobule vl = delta_left / dt;
-        double vr = delta_right / dt;
-        joint_state_msg->velocity = {vl, vr};
+        joint_state_msg->velocity = {left_vel, right_vel};
         joint_state_publisher_ ->publish(std::move(joint_state_msg));
 
         RCLCPP_DEBUG(this->get_logger(), "Published JointState: L=%.2f, R=%.2f", left_pos_, right_pos_);
@@ -149,5 +148,4 @@ private:
     int32_t last_right_pos_unit_;
     double left_pos_;
     double right_pos_;
-    rclcpp::Time last_time;
 };
