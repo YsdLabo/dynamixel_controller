@@ -16,7 +16,7 @@ class MotorControl : public rclcpp::Node
 public:
     MotorControl(double radius, double separation)
         : Node("motor_control_node"), wheel_radius_(radius), wheel_separation_(separation), 
-        target_omega_left_(0.0), target_omega_right_(0.0), target_linear_x_(0.0), target_angular_z_(0.0), last_position_left_(0.0), last_position_right_(0.0)
+        target_omega_left_(0.0), target_omega_right_(0.0), target_linear_x_(0.0), target_angular_z_(0.0)
     {
         // パラメータ宣言
         this->declare_parameter("control_frequency", 50.0);
@@ -63,6 +63,10 @@ public:
             rclcpp::shutdown();
             return;
         }
+        dxl_interface_->get_position(LEFT_ID, left_pos_unit_i_);
+        dxl_interface_->get_position(RIGHT_ID, right_pos_unit_i_);
+        last_left_pos_ = (double)left_pos_unit_i_ * UNIT_TO_RAD;
+        last_right_pos_ = (double)right_pos_unit_i_ * UNIT_TO_RAD;
     }
 
 private:
@@ -75,7 +79,7 @@ private:
         target_omega_left_ = (target_linear_x_ - target_angular_z_ * wheel_separation_ / 2.0) / wheel_radius_;
         target_omega_right_ = (target_linear_x_ + target_angular_z_ * wheel_separation_ / 2.0) / wheel_radius_;
 
-        RCLCPP_INFO(this->get_logger(), "Received (Stamped): v=%.2f, w=%.2f -> Left/Right Omega: %.2f / %.2f rad/s",
+        RCLCPP_INFO(this->get_logger(), "Received(TwistStamped): v=%.2f, w=%.2f -> Left/Right Omega: %.2f / %.2f rad/s",
             target_linear_x_, target_angular_z_, target_omega_left_, target_omega_right_);
     }
 
@@ -104,11 +108,13 @@ private:
         auto joint_state_msg = std::make_unique<sensor_msgs::msg::JointState>();
         joint_state_msg->header.stamp = this->now();
         joint_state_msg->name = {"left_wheel_joint", "right_wheel_joint"};
-        double left_rad = (double)left_pos_unit * UNIT_TO_RAD;
-        double right_rad = (double)right_pos_unit * UNIT_TO_RAD;
-        joint_state_msg->position = {left_rad, right_rad};
+        double left_pos = (double)left_pos_unit * UNIT_TO_RAD;
+        double right_pos = (double)right_pos_unit * UNIT_TO_RAD;
+        joint_state_msg->position = {left_pos, right_pos};
         joint_state_msg->velocity = {0.0, 0.0};
         joint_state_publisher_ ->publish(std::move(joint_state_msg));
+        last_left_pos_ = left_pos;
+        last_right_pos_ = right_pos;
 
         RCLCPP_DEBUG(this->get_logger(), "Published JointState: L=%.2f, R=%.2f", left_rad, right_rad);
 
@@ -128,7 +134,10 @@ private:
     double target_omega_right_;
     double target_linear_x_;
     double target_angular_z_;
-    double last_position_left_;
-    double last_position_right_;
-
+    double last_left_pos_;
+    double last_right_pos_;
+    int32_t left_pos_unit_i_;
+    int32_t right_pos_unit_i_;
+    long left_pos_;
+    long right_pos_;
 };
