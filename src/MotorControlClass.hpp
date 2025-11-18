@@ -63,10 +63,9 @@ public:
             rclcpp::shutdown();
             return;
         }
-        dxl_interface_->get_position(LEFT_ID, left_pos_unit_i_);
-        dxl_interface_->get_position(RIGHT_ID, right_pos_unit_i_);
-        last_left_pos_ = (double)left_pos_unit_i_ * UNIT_TO_RAD;
-        last_right_pos_ = (double)right_pos_unit_i_ * UNIT_TO_RAD;
+        dxl_interface_->get_position(LEFT_ID, last_left_pos_unit_);
+        dxl_interface_->get_position(RIGHT_ID, last_right_pos_unit_);
+        last_time = this->get_clock()->now();
     }
 
 private:
@@ -103,6 +102,12 @@ private:
         int32_t left_pos_unit, right_pos_unit;
         dxl_interface_->get_position(LEFT_ID, left_pos_unit);
         dxl_interface_->get_position(RIGHT_ID, right_pos_unit);
+        int32_t delta_left = left_pos_unit - last_left_pos_unit_;
+        if(delta_left < -2048) delta_left += 4096;
+        else if(delta_left > 2048) delta_left -= 4096;
+        int32_t delta_right = right_pos_unit - last_right_pos_unit_;
+        if(delta_right < -2048) delta_right += 4096;
+        else if(delta_right > 2048) delta_right -= 4096;
 
         // JointStateの配信
         auto joint_state_msg = std::make_unique<sensor_msgs::msg::JointState>();
@@ -110,7 +115,9 @@ private:
         joint_state_msg->name = {"left_wheel_joint", "right_wheel_joint"};
         double left_pos = (double)left_pos_unit * UNIT_TO_RAD;
         double right_pos = (double)right_pos_unit * UNIT_TO_RAD;
-        joint_state_msg->position = {left_pos, right_pos};
+        left_pos_ += ;
+        right_pos_ += ;
+        joint_state_msg->position = {left_pos_, right_pos_};
         joint_state_msg->velocity = {0.0, 0.0};
         joint_state_publisher_ ->publish(std::move(joint_state_msg));
         last_left_pos_ = left_pos;
@@ -134,10 +141,11 @@ private:
     double target_omega_right_;
     double target_linear_x_;
     double target_angular_z_;
-    double last_left_pos_;
-    double last_right_pos_;
+    int32_t last_left_pos_unit_;
+    int32_t last_right_pos_unit_;
     int32_t left_pos_unit_i_;
     int32_t right_pos_unit_i_;
     long left_pos_;
     long right_pos_;
+    rclcpp::Time last_time;
 };
