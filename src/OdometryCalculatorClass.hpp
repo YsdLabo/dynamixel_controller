@@ -89,8 +89,8 @@ private:
 
         if(dt > 0.0)
         {
-            odom_msg->twist.twist.linear.x = dx / dt;
-            odom_msg->twist.twist.linear.y = dy / dt;
+            odom_msg->twist.twist.linear.x = delta_dist / dt;
+            odom_msg->twist.twist.linear.y = 0.0;
             odom_msg->twist.twist.angular.z = delta_theta / dt;
         }
 
