@@ -69,11 +69,6 @@ public:
         return false;
     }
 
-    void reset_encoder()
-    {
-        
-    }
-
     int32_t rad_per_sec_to_unit(double rad_per_sec) const
     {
         double rpm = rad_per_sec * 60.0 / (2.0 * M_PI);
