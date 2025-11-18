@@ -9,6 +9,7 @@
 #define ADDR_TORQUE_ENABLE 64
 #define ADDR_GOAL_VELOCITY 104
 #define ADDR_PRESENT_POSITION 132
+#define ADDR_PRESENT_VELOCITY 128
 
 #define VELOCITY_CONTROL_MODE 1
 #define TORQUE_ENABLE 1
@@ -69,11 +70,32 @@ public:
         return false;
     }
 
+    bool get_velocity(unit8_t id, double& present_velocity)
+    {
+        unit8_t dxl_error = 0;
+        unit32_t temp_velocity = 0;
+
+        int dxl_comm_result = packetHandler_->read4ByteTxRx(portHandler_.get(), id, ADDR_PRESENT_VELOCITY, &temp_velocity, &dxl_error);
+
+        if(dxl_comm_result == COMM_SUCCESS && dxl_error == 0) {
+            present_velocity = unit_to_rad_per_sec((int32_t)temp_velocity);
+            return true;
+        }
+        return false;
+    }
+
     int32_t rad_per_sec_to_unit(double rad_per_sec) const
     {
         double rpm = rad_per_sec * 60.0 / (2.0 * M_PI);
         int32_t unit = (int32_t)(rpm / VEL_CONVERSION_FACTOR);
         return unit;
+    }
+
+    double unit_to_rad_per_sec(int32_t unit)
+    {
+        double rpm = VEL_CONVERSION_FACTOR * unit;
+        double rad_per_sec = (2.0 * M_PI * rpm) / 60.0;
+        return rad_per_sec;
     }
 
 private:
