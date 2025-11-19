@@ -70,10 +70,10 @@ public:
         return false;
     }
 
-    bool get_velocity(unit8_t id, double& present_velocity)
+    bool get_velocity(uint8_t id, double& present_velocity)
     {
-        unit8_t dxl_error = 0;
-        unit32_t temp_velocity = 0;
+        uint8_t dxl_error = 0;
+        uint32_t temp_velocity = 0;
 
         int dxl_comm_result = packetHandler_->read4ByteTxRx(portHandler_.get(), id, ADDR_PRESENT_VELOCITY, &temp_velocity, &dxl_error);
 
